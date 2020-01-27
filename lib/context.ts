@@ -14,7 +14,7 @@ function defaultProcessor(code) {
   return code;
 }
 
-class Context {
+export class Context {
   constructor({
     implSuffix = "",
     processCEReactions = defaultProcessor,
@@ -81,5 +81,3 @@ class Context {
     return processor.call(context, code);
   }
 }
-
-module.exports = Context;

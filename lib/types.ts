@@ -1,21 +1,20 @@
 "use strict";
+import * as utils from "./utils.ts";
+import {default as conversions} from "./webidl_conversions.ts";
 
-const conversions = require("webidl-conversions");
-
-const utils = require("./utils");
 
 const typedArrayTypes = new Set([
   "Int8Array", "Int16Array", "Int32Array", "Uint8Array", "Uint16Array", "Uint32Array",
   "Uint8ClampedArray", "Float32Array", "Float64Array"
 ]);
-const arrayBufferViewTypes = new Set([...typedArrayTypes, "DataView"]);
+export const arrayBufferViewTypes = new Set([...typedArrayTypes, "DataView"]);
 const bufferSourceTypes = new Set([...arrayBufferViewTypes, "ArrayBuffer"]);
-const stringTypes = new Set(["DOMString", "ByteString", "USVString"]);
+export const stringTypes = new Set(["DOMString", "ByteString", "USVString"]);
 const integerTypes = new Set([
   "byte", "octet", "short", "unsigned short", "long", "unsigned long",
   "long long", "unsigned long long"
 ]);
-const numericTypes = new Set([
+export const numericTypes = new Set([
   ...integerTypes, "float", "unrestricted float", "double", "unrestricted double"
 ]);
 
@@ -28,7 +27,7 @@ function mergeExtAttrs(a = [], b = []) {
 // Types of types that generate an output file.
 const resolvedTypes = new Set(["dictionary", "enumeration", "interface"]);
 
-function resolveType(ctx, idlType, stack = []) {
+export function resolveType(ctx, idlType, stack = []) {
   if (resolvedMap.has(idlType)) {
     return resolvedMap.get(idlType);
   }
@@ -83,7 +82,7 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function generateTypeConversion(ctx, name, idlType, argAttrs = [], parentName, errPrefix = '"The provided value"') {
+export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parentName, errPrefix = '"The provided value"') {
   const requires = new utils.RequiresMap(ctx);
   let str = "";
 
@@ -491,7 +490,7 @@ function extractUnionInfo(ctx, idlType, errPrefix) {
 }
 
 // https://heycam.github.io/webidl/#dfn-includes-a-nullable-type
-function includesNullableType(ctx, idlType) {
+export function includesNullableType(ctx, idlType) {
   idlType = resolveType(ctx, idlType);
   if (idlType.nullable) {
     return true;
@@ -507,7 +506,7 @@ function includesNullableType(ctx, idlType) {
   return false;
 }
 
-function includesDictionaryType(ctx, idlType) {
+export function includesDictionaryType(ctx, idlType) {
   idlType = resolveType(ctx, idlType);
   if (typeof idlType.idlType === "string" && ctx.dictionaries.has(idlType.idlType)) {
     return true;
@@ -523,7 +522,7 @@ function includesDictionaryType(ctx, idlType) {
   return false;
 }
 
-function sameType(ctx, type1, type2) {
+export function sameType(ctx, type1, type2) {
   if (type1 === type2) {
     return true;
   }
@@ -573,7 +572,7 @@ function sameType(ctx, type1, type2) {
          extracted1.unknown === extracted2.unknown;
 }
 
-function areDistinguishable(ctx, type1, type2) {
+export function areDistinguishable(ctx, type1, type2) {
   const resolved1 = resolveType(ctx, type1);
   const resolved2 = resolveType(ctx, type2);
 
@@ -658,7 +657,7 @@ function areDistinguishable(ctx, type1, type2) {
   return inner(resolved1, resolved2) && inner(resolved2, resolved1);
 }
 
-module.exports = {
+export default {
   arrayBufferViewTypes,
   stringTypes,
   numericTypes,

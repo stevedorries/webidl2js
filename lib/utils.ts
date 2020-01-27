@@ -1,6 +1,5 @@
-"use strict";
 
-function getDefault(dflt) {
+export function getDefault(dflt) {
   switch (dflt.type) {
     case "boolean":
     case "string":
@@ -18,7 +17,7 @@ function getDefault(dflt) {
   throw new Error("Unexpected default type: " + dflt.type);
 }
 
-function getExtAttr(attrs, name) {
+export function getExtAttr(attrs, name) {
   for (let i = 0; i < attrs.length; ++i) {
     if (attrs[i].name === name) {
       return attrs[i];
@@ -28,15 +27,15 @@ function getExtAttr(attrs, name) {
   return null;
 }
 
-function isGlobal(idl) {
+export function isGlobal(idl) {
   return Boolean(getExtAttr(idl.extAttrs, "Global"));
 }
 
-function hasCEReactions(idl) {
+export function hasCEReactions(idl) {
   return Boolean(getExtAttr(idl.extAttrs, "CEReactions"));
 }
 
-function isOnInstance(memberIDL, interfaceIDL) {
+export function isOnInstance(memberIDL, interfaceIDL) {
   return memberIDL.special !== "static" && (getExtAttr(memberIDL.extAttrs, "Unforgeable") || isGlobal(interfaceIDL));
 }
 
@@ -57,15 +56,17 @@ function propertyName(name) {
   return JSON.stringify(name);
 }
 
-function stringifyPropertyKey(prop) {
+export function stringifyPropertyKey(prop) {
   return typeof prop === "symbol" ? `[${symbolName(prop)}]` : propertyName(prop);
 }
 
-function stringifyPropertyName(prop) {
+export function stringifyPropertyName(prop) {
   return typeof prop === "symbol" ? symbolName(prop) : JSON.stringify(propertyName(prop));
 }
 
-class RequiresMap extends Map {
+export class RequiresMap extends Map {
+  ctx: any;
+  
   constructor(ctx) {
     super();
     this.ctx = ctx;
@@ -105,14 +106,3 @@ class RequiresMap extends Map {
     return [...this.keys()].map(key => `const ${key} = ${this.get(key)};`).join("\n");
   }
 }
-
-module.exports = {
-  getDefault,
-  getExtAttr,
-  isGlobal,
-  hasCEReactions,
-  isOnInstance,
-  stringifyPropertyKey,
-  stringifyPropertyName,
-  RequiresMap
-};
