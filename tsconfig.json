@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "target": "es2019",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "declaration": true
+  },
+  "include": [
+    "index.ts",
+    "lib/"
+  ],
+  "exclude": ["dist/"]
+}

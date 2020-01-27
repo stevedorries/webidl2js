@@ -5,7 +5,7 @@
 "use strict";
 
 const { collect } = require("./util/collect");
-const { parse, validate, WebIDLParseError } = require("..");
+const { parse, validate, WebIDLParseError } = require("../dist/mod.js");
 const expect = require("expect");
 
 describe("Parses all of the invalid IDLs to check that they blow up correctly", () => {
