@@ -1,158 +1,169 @@
-"use strict";
 let exports: any = {};
-function _(message, opts) {
-    return `${opts && opts.context ? opts.context : "Value"} ${message}.`;
+function _(message: string, opts?: any) {
+  return `${opts && opts.context ? opts.context : "Value"} ${message}.`;
 }
 
-function type(V) {
-    if (V === null) {
-        return "Null";
-    }
-    switch (typeof V) {
-        case "undefined":
-            return "Undefined";
-        case "boolean":
-            return "Boolean";
-        case "number":
-            return "Number";
-        case "string":
-            return "String";
-        case "symbol":
-            return "Symbol";
-        case "bigint":
-            return "BigInt";
-        case "object":
-            // Falls through
-        case "function":
-            // Falls through
-        default:
-            // Per ES spec, typeof returns an implemention-defined value that is not any of the existing ones for
-            // uncallable non-standard exotic objects. Yet Type() which the Web IDL spec depends on returns Object for
-            // such cases. So treat the default case as an object.
-            return "Object";
-    }
+function type(V: any) {
+  if (V === null) {
+    return "Null";
+  }
+  switch (typeof V) {
+    case "undefined":
+      return "Undefined";
+    case "boolean":
+      return "Boolean";
+    case "number":
+      return "Number";
+    case "string":
+      return "String";
+    case "symbol":
+      return "Symbol";
+    case "bigint":
+      return "BigInt";
+    case "object":
+    // Falls through
+    case "function":
+    // Falls through
+    default:
+      // Per ES spec, typeof returns an implemention-defined value that is not any of the existing ones for
+      // uncallable non-standard exotic objects. Yet Type() which the Web IDL spec depends on returns Object for
+      // such cases. So treat the default case as an object.
+      return "Object";
+  }
 }
 
 // Round x to the nearest integer, choosing the even integer if it lies halfway between two.
-function evenRound(x) {
-    // There are four cases for numbers with fractional part being .5:
-    //
-    // case |     x     | floor(x) | round(x) | expected | x <> 0 | x % 1 | x & 1 |   example
-    //   1  |  2n + 0.5 |  2n      |  2n + 1  |  2n      |   >    |  0.5  |   0   |  0.5 ->  0
-    //   2  |  2n + 1.5 |  2n + 1  |  2n + 2  |  2n + 2  |   >    |  0.5  |   1   |  1.5 ->  2
-    //   3  | -2n - 0.5 | -2n - 1  | -2n      | -2n      |   <    | -0.5  |   0   | -0.5 ->  0
-    //   4  | -2n - 1.5 | -2n - 2  | -2n - 1  | -2n - 2  |   <    | -0.5  |   1   | -1.5 -> -2
-    // (where n is a non-negative integer)
-    //
-    // Branch here for cases 1 and 4
-    if ((x > 0 && (x % 1) === +0.5 && (x & 1) === 0) ||
-        (x < 0 && (x % 1) === -0.5 && (x & 1) === 1)) {
-        return censorNegativeZero(Math.floor(x));
+function evenRound(x: number) {
+  // There are four cases for numbers with fractional part being .5:
+  //
+  // case |     x     | floor(x) | round(x) | expected | x <> 0 | x % 1 | x & 1 |   example
+  //   1  |  2n + 0.5 |  2n      |  2n + 1  |  2n      |   >    |  0.5  |   0   |  0.5 ->  0
+  //   2  |  2n + 1.5 |  2n + 1  |  2n + 2  |  2n + 2  |   >    |  0.5  |   1   |  1.5 ->  2
+  //   3  | -2n - 0.5 | -2n - 1  | -2n      | -2n      |   <    | -0.5  |   0   | -0.5 ->  0
+  //   4  | -2n - 1.5 | -2n - 2  | -2n - 1  | -2n - 2  |   <    | -0.5  |   1   | -1.5 -> -2
+  // (where n is a non-negative integer)
+  //
+  // Branch here for cases 1 and 4
+  if (
+    (x > 0 && x % 1 === +0.5 && (x & 1) === 0) ||
+    (x < 0 && x % 1 === -0.5 && (x & 1) === 1)
+  ) {
+    return censorNegativeZero(Math.floor(x));
+  }
+
+  return censorNegativeZero(Math.round(x));
+}
+
+function integerPart(n: number) {
+  return censorNegativeZero(Math.trunc(n));
+}
+
+function sign(x: number) {
+  return x < 0 ? -1 : 1;
+}
+
+function modulo(x: number, y: number) {
+  // https://tc39.github.io/ecma262/#eqn-modulo
+  // Note that http://stackoverflow.com/a/4467559/3191 does NOT work for large modulos
+  const signMightNotMatch = x % y;
+  if (sign(y) !== sign(signMightNotMatch)) {
+    return signMightNotMatch + y;
+  }
+  return signMightNotMatch;
+}
+
+function censorNegativeZero(x: number) {
+  return x === 0 ? 0 : x;
+}
+
+function createIntegerConversion(
+  bitLength: number,
+  typeOpts: { unsigned: any }
+) {
+  const isSigned = !typeOpts.unsigned;
+
+  let lowerBound;
+  let upperBound;
+  if (bitLength === 64) {
+    upperBound = Math.pow(2, 53) - 1;
+    lowerBound = !isSigned ? 0 : -Math.pow(2, 53) + 1;
+  } else if (!isSigned) {
+    lowerBound = 0;
+    upperBound = Math.pow(2, bitLength) - 1;
+  } else {
+    lowerBound = -Math.pow(2, bitLength - 1);
+    upperBound = Math.pow(2, bitLength - 1) - 1;
+  }
+
+  const twoToTheBitLength = Math.pow(2, bitLength);
+  const twoToOneLessThanTheBitLength = Math.pow(2, bitLength - 1);
+
+  return (
+    V: string | number,
+    opts?: { enforceRange?: any; clamp?: any; context?: any }
+  ) => {
+    if (opts === undefined) {
+      opts = {};
     }
 
-    return censorNegativeZero(Math.round(x));
-}
+    let x = +V;
+    x = censorNegativeZero(x); // Spec discussion ongoing: https://github.com/heycam/webidl/issues/306
 
-function integerPart(n) {
-    return censorNegativeZero(Math.trunc(n));
-}
+    if (opts.enforceRange) {
+      if (!Number.isFinite(x)) {
+        throw new TypeError(_("is not a finite number", opts));
+      }
 
-function sign(x) {
-    return x < 0 ? -1 : 1;
-}
+      x = integerPart(x);
 
-function modulo(x, y) {
-    // https://tc39.github.io/ecma262/#eqn-modulo
-    // Note that http://stackoverflow.com/a/4467559/3191 does NOT work for large modulos
-    const signMightNotMatch = x % y;
-    if (sign(y) !== sign(signMightNotMatch)) {
-        return signMightNotMatch + y;
-    }
-    return signMightNotMatch;
-}
+      if (x < lowerBound || x > upperBound) {
+        throw new TypeError(
+          _(
+            `is outside the accepted range of ${lowerBound} to ${upperBound}, inclusive`,
+            opts
+          )
+        );
+      }
 
-function censorNegativeZero(x) {
-    return x === 0 ? 0 : x;
-}
-
-function createIntegerConversion(bitLength, typeOpts) {
-    const isSigned = !typeOpts.unsigned;
-
-    let lowerBound;
-    let upperBound;
-    if (bitLength === 64) {
-        upperBound = Math.pow(2, 53) - 1;
-        lowerBound = !isSigned ? 0 : -Math.pow(2, 53) + 1;
-    } else if (!isSigned) {
-        lowerBound = 0;
-        upperBound = Math.pow(2, bitLength) - 1;
-    } else {
-        lowerBound = -Math.pow(2, bitLength - 1);
-        upperBound = Math.pow(2, bitLength - 1) - 1;
+      return x;
     }
 
-    const twoToTheBitLength = Math.pow(2, bitLength);
-    const twoToOneLessThanTheBitLength = Math.pow(2, bitLength - 1);
+    if (!Number.isNaN(x) && opts.clamp) {
+      x = Math.min(Math.max(x, lowerBound), upperBound);
+      x = evenRound(x);
+      return x;
+    }
 
-    return (V, opts) => {
-        if (opts === undefined) {
-            opts = {};
-        }
+    if (!Number.isFinite(x) || x === 0) {
+      return 0;
+    }
+    x = integerPart(x);
 
-        let x = +V;
-        x = censorNegativeZero(x); // Spec discussion ongoing: https://github.com/heycam/webidl/issues/306
+    // Math.pow(2, 64) is not accurately representable in JavaScript, so try to avoid these per-spec operations if
+    // possible. Hopefully it's an optimization for the non-64-bitLength cases too.
+    if (x >= lowerBound && x <= upperBound) {
+      return x;
+    }
 
-        if (opts.enforceRange) {
-            if (!Number.isFinite(x)) {
-                throw new TypeError(_("is not a finite number", opts));
-            }
-
-            x = integerPart(x);
-
-            if (x < lowerBound || x > upperBound) {
-                throw new TypeError(_(
-                    `is outside the accepted range of ${lowerBound} to ${upperBound}, inclusive`, opts));
-            }
-
-            return x;
-        }
-
-        if (!Number.isNaN(x) && opts.clamp) {
-            x = Math.min(Math.max(x, lowerBound), upperBound);
-            x = evenRound(x);
-            return x;
-        }
-
-        if (!Number.isFinite(x) || x === 0) {
-            return 0;
-        }
-        x = integerPart(x);
-
-        // Math.pow(2, 64) is not accurately representable in JavaScript, so try to avoid these per-spec operations if
-        // possible. Hopefully it's an optimization for the non-64-bitLength cases too.
-        if (x >= lowerBound && x <= upperBound) {
-            return x;
-        }
-
-        // These will not work great for bitLength of 64, but oh well. See the README for more details.
-        x = modulo(x, twoToTheBitLength);
-        if (isSigned && x >= twoToOneLessThanTheBitLength) {
-            return x - twoToTheBitLength;
-        }
-        return x;
-    };
+    // These will not work great for bitLength of 64, but oh well. See the README for more details.
+    x = modulo(x, twoToTheBitLength);
+    if (isSigned && x >= twoToOneLessThanTheBitLength) {
+      return x - twoToTheBitLength;
+    }
+    return x;
+  };
 }
 
 exports.any = V => {
-    return V;
+  return V;
 };
 
-exports.void = function () {
-    return undefined;
+exports.void = function() {
+  return undefined;
 };
 
-exports.boolean = function (val) {
-    return !!val;
+exports.boolean = function(val) {
+  return !!val;
 };
 
 exports.byte = createIntegerConversion(8, { unsigned: false });
@@ -168,117 +179,121 @@ exports["long long"] = createIntegerConversion(64, { unsigned: false });
 exports["unsigned long long"] = createIntegerConversion(64, { unsigned: true });
 
 exports.double = (V, opts) => {
-    const x = +V;
+  const x = +V;
 
-    if (!Number.isFinite(x)) {
-        throw new TypeError(_("is not a finite floating-point value", opts));
-    }
+  if (!Number.isFinite(x)) {
+    throw new TypeError(_("is not a finite floating-point value", opts));
+  }
 
-    return x;
+  return x;
 };
 
 exports["unrestricted double"] = V => {
-    const x = +V;
+  const x = +V;
 
-    return x;
+  return x;
 };
 
 exports.float = (V, opts) => {
-    const x = +V;
+  const x = +V;
 
-    if (!Number.isFinite(x)) {
-        throw new TypeError(_("is not a finite floating-point value", opts));
-    }
+  if (!Number.isFinite(x)) {
+    throw new TypeError(_("is not a finite floating-point value", opts));
+  }
 
-    if (Object.is(x, -0)) {
-        return x;
-    }
+  if (Object.is(x, -0)) {
+    return x;
+  }
 
-    const y = Math.fround(x);
+  const y = Math.fround(x);
 
-    if (!Number.isFinite(y)) {
-        throw new TypeError(_("is outside the range of a single-precision floating-point value", opts));
-    }
+  if (!Number.isFinite(y)) {
+    throw new TypeError(
+      _("is outside the range of a single-precision floating-point value", opts)
+    );
+  }
 
-    return y;
+  return y;
 };
 
 exports["unrestricted float"] = V => {
-    const x = +V;
+  const x = +V;
 
-    if (isNaN(x)) {
-        return x;
-    }
+  if (isNaN(x)) {
+    return x;
+  }
 
-    if (Object.is(x, -0)) {
-        return x;
-    }
+  if (Object.is(x, -0)) {
+    return x;
+  }
 
-    return Math.fround(x);
+  return Math.fround(x);
 };
 
-exports.DOMString = function (V, opts) {
-    if (opts === undefined) {
-        opts = {};
-    }
+exports.DOMString = function(V, opts) {
+  if (opts === undefined) {
+    opts = {};
+  }
 
-    if (opts.treatNullAsEmptyString && V === null) {
-        return "";
-    }
+  if (opts.treatNullAsEmptyString && V === null) {
+    return "";
+  }
 
-    if (typeof V === "symbol") {
-        throw new TypeError(_("is a symbol, which cannot be converted to a string", opts));
-    }
+  if (typeof V === "symbol") {
+    throw new TypeError(
+      _("is a symbol, which cannot be converted to a string", opts)
+    );
+  }
 
-    return String(V);
+  return String(V);
 };
 
 exports.ByteString = (V, opts) => {
-    const x = exports.DOMString(V, opts);
-    let c;
-    for (let i = 0; (c = x.codePointAt(i)) !== undefined; ++i) {
-        if (c > 255) {
-            throw new TypeError(_("is not a valid ByteString", opts));
-        }
+  const x = exports.DOMString(V, opts);
+  let c;
+  for (let i = 0; (c = x.codePointAt(i)) !== undefined; ++i) {
+    if (c > 255) {
+      throw new TypeError(_("is not a valid ByteString", opts));
     }
+  }
 
-    return x;
+  return x;
 };
 
 exports.USVString = (V, opts) => {
-    const S = exports.DOMString(V, opts);
-    const n = S.length;
-    const U = [];
-    for (let i = 0; i < n; ++i) {
-        const c = S.charCodeAt(i);
-        if (c < 0xD800 || c > 0xDFFF) {
-            U.push(String.fromCodePoint(c));
-        } else if (0xDC00 <= c && c <= 0xDFFF) {
-            U.push(String.fromCodePoint(0xFFFD));
-        } else if (i === n - 1) {
-            U.push(String.fromCodePoint(0xFFFD));
-        } else {
-            const d = S.charCodeAt(i + 1);
-            if (0xDC00 <= d && d <= 0xDFFF) {
-                const a = c & 0x3FF;
-                const b = d & 0x3FF;
-                U.push(String.fromCodePoint((2 << 15) + ((2 << 9) * a) + b));
-                ++i;
-            } else {
-                U.push(String.fromCodePoint(0xFFFD));
-            }
-        }
+  const S = exports.DOMString(V, opts);
+  const n = S.length;
+  const U = [];
+  for (let i = 0; i < n; ++i) {
+    const c = S.charCodeAt(i);
+    if (c < 0xd800 || c > 0xdfff) {
+      U.push(String.fromCodePoint(c));
+    } else if (0xdc00 <= c && c <= 0xdfff) {
+      U.push(String.fromCodePoint(0xfffd));
+    } else if (i === n - 1) {
+      U.push(String.fromCodePoint(0xfffd));
+    } else {
+      const d = S.charCodeAt(i + 1);
+      if (0xdc00 <= d && d <= 0xdfff) {
+        const a = c & 0x3ff;
+        const b = d & 0x3ff;
+        U.push(String.fromCodePoint((2 << 15) + (2 << 9) * a + b));
+        ++i;
+      } else {
+        U.push(String.fromCodePoint(0xfffd));
+      }
     }
+  }
 
-    return U.join("");
+  return U.join("");
 };
 
 exports.object = (V, opts) => {
-    if (type(V) !== "Object") {
-        throw new TypeError(_("is not an object", opts));
-    }
+  if (type(V) !== "Object") {
+    throw new TypeError(_("is not an object", opts));
+  }
 
-    return V;
+  return V;
 };
 
 // Not exported, but used in Function and VoidFunction.
@@ -286,74 +301,87 @@ exports.object = (V, opts) => {
 // Neither Function nor VoidFunction is defined with [TreatNonObjectAsNull], so
 // handling for that is omitted.
 function convertCallbackFunction(V, opts) {
-    if (typeof V !== "function") {
-        throw new TypeError(_("is not a function", opts));
-    }
-    return V;
+  if (typeof V !== "function") {
+    throw new TypeError(_("is not a function", opts));
+  }
+  return V;
 }
 
-const abByteLengthGetter =
-    Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength").get;
+const abByteLengthGetter = Object.getOwnPropertyDescriptor(
+  ArrayBuffer.prototype,
+  "byteLength"
+).get;
 
 function isArrayBuffer(V) {
-    try {
-        abByteLengthGetter.call(V);
-        return true;
-    } catch (e) {
-        return false;
-    }
+  try {
+    abByteLengthGetter.call(V);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 // I don't think we can reliably detect detached ArrayBuffers.
 exports.ArrayBuffer = (V, opts) => {
-    if (!isArrayBuffer(V)) {
-        throw new TypeError(_("is not a view on an ArrayBuffer object", opts));
-    }
-    return V;
+  if (!isArrayBuffer(V)) {
+    throw new TypeError(_("is not a view on an ArrayBuffer object", opts));
+  }
+  return V;
 };
 
-const dvByteLengthGetter =
-    Object.getOwnPropertyDescriptor(DataView.prototype, "byteLength").get;
+const dvByteLengthGetter = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "byteLength"
+).get;
 exports.DataView = (V, opts) => {
-    try {
-        dvByteLengthGetter.call(V);
-        return V;
-    } catch (e) {
-        throw new TypeError(_("is not a view on an DataView object", opts));
-    }
+  try {
+    dvByteLengthGetter.call(V);
+    return V;
+  } catch (e) {
+    throw new TypeError(_("is not a view on an DataView object", opts));
+  }
 };
 
 [
-    Int8Array, Int16Array, Int32Array, Uint8Array,
-    Uint16Array, Uint32Array, Uint8ClampedArray, Float32Array, Float64Array
+  Int8Array,
+  Int16Array,
+  Int32Array,
+  Uint8Array,
+  Uint16Array,
+  Uint32Array,
+  Uint8ClampedArray,
+  Float32Array,
+  Float64Array
 ].forEach(func => {
-    const name = func.name;
-    const article = /^[AEIOU]/.test(name) ? "an" : "a";
-    exports[name] = (V, opts) => {
-        if (!ArrayBuffer.isView(V) || V.constructor.name !== name) {
-            throw new TypeError(_(`is not ${article} ${name} object`, opts));
-        }
+  const name = func.name;
+  const article = /^[AEIOU]/.test(name) ? "an" : "a";
+  exports[name] = (V, opts) => {
+    if (!ArrayBuffer.isView(V) || V.constructor.name !== name) {
+      throw new TypeError(_(`is not ${article} ${name} object`, opts));
+    }
 
-        return V;
-    };
+    return V;
+  };
 });
 
 // Common definitions
 
 exports.ArrayBufferView = (V, opts) => {
-    if (!ArrayBuffer.isView(V)) {
-        throw new TypeError(_("is not a view on an ArrayBuffer object", opts));
-    }
+  if (!ArrayBuffer.isView(V)) {
+    throw new TypeError(_("is not a view on an ArrayBuffer object", opts));
+  }
 
-    return V;
+  return V;
 };
 
 exports.BufferSource = (V, opts) => {
-    if (!ArrayBuffer.isView(V) && !isArrayBuffer(V)) {
-        throw new TypeError(_("is not an ArrayBuffer object or a view on one", opts));
-    }
+  if (!ArrayBuffer.isView(V) && !isArrayBuffer(V)) {
+    throw new TypeError(
+      _("is not an ArrayBuffer object or a view on one", opts)
+    );
+  }
 
-    return V;
+  return V;
 };
 
 exports.DOMTimeStamp = exports["unsigned long long"];

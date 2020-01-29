@@ -1,9 +1,14 @@
-"use strict";
+import * as Types from "../types.ts";
+import * as utils from "../utils.ts"
 
-const Types = require("../types");
-const utils = require("../utils");
-
-class Dictionary {
+export class Dictionary {
+  ctx: any;
+  idl: any;
+  name: any;
+  requires: utils.RequiresMap;
+  str: string;
+  type: string = "dictionary";
+  
   constructor(ctx, idl) {
     this.ctx = ctx;
     this.idl = idl;
@@ -112,7 +117,3 @@ class Dictionary {
     return this.str;
   }
 }
-
-Dictionary.prototype.type = "dictionary";
-
-module.exports = Dictionary;

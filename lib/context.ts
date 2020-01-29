@@ -1,8 +1,7 @@
-"use strict";
-const webidl = require("webidl2");
-const Typedef = require("./constructs/typedef");
+import { Typedef } from "./constructs/typedef.ts";
+import { webidl2 } from "./deps.ts";
 
-const builtinTypedefs = webidl.parse(`
+const builtinTypedefs = webidl2.parse(`
   typedef (Int8Array or Int16Array or Int32Array or
            Uint8Array or Uint16Array or Uint32Array or Uint8ClampedArray or
            Float32Array or Float64Array or DataView) ArrayBufferView;
@@ -15,11 +14,20 @@ function defaultProcessor(code) {
 }
 
 export class Context {
+  implSuffix: string;
+  processCEReactions: (code: any) => any;
+  processHTMLConstructor: (code: any) => any;
+  options: any;
+  typedefs: Map<any, any>;
+  interfaces: Map<any, any>;
+  interfaceMixins: Map<any, any>;
+  dictionaries: Map<any, any>;
+  enumerations: Map<any, any>;
   constructor({
     implSuffix = "",
     processCEReactions = defaultProcessor,
     processHTMLConstructor = defaultProcessor,
-    options
+    options = undefined
   } = {}) {
     this.implSuffix = implSuffix;
     this.processCEReactions = processCEReactions;

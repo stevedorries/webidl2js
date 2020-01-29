@@ -1,5 +1,3 @@
-"use strict";
-
 // Returns "Type(value) is Object" in ES terminology.
 function isObject(value) {
   return typeof value === "object" && value !== null || typeof value === "function";
@@ -48,11 +46,11 @@ function tryImplForWrapper(wrapper) {
 const iterInternalSymbol = Symbol("internal");
 const IteratorPrototype = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]()));
 
-function isArrayIndexPropName(P) {
+function isArrayIndexPropName(P: unknown) {
   if (typeof P !== "string") {
     return false;
   }
-  const i = P >>> 0;
+  const i = +P >>> 0;
   if (i === Math.pow(2, 32) - 1) {
     return false;
   }
@@ -86,7 +84,7 @@ const namedSetNew = Symbol("named property set new");
 const namedSetExisting = Symbol("named property set existing");
 const namedDelete = Symbol("named property delete");
 
-module.exports = exports = {
+export default {
   isObject,
   hasOwn,
   wrapperSymbol,

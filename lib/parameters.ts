@@ -1,9 +1,6 @@
-"use strict";
-
-const Overloads = require("./overloads");
-const Types = require("./types");
-
-const utils = require("./utils");
+import * as Overloads from "./overloads.ts";
+import * as Types from "./types.ts";
+import * as utils from "./utils.ts";
 
 function isOrIncludes(ctx, parent, predicate) {
   parent = Types.resolveType(ctx, parent);
@@ -46,7 +43,7 @@ function generateVarConversion(ctx, overload, i, parent, errPrefix, targetIdx = 
   };
 }
 
-module.exports.generateOverloadConversions = function (ctx, typeOfOp, name, parent, errPrefix) {
+export function generateOverloadConversions (ctx, typeOfOp, name, parent, errPrefix) {
   const requires = new utils.RequiresMap(ctx);
   const ops = Overloads.getOperations(typeOfOp, name, parent);
   const argLengths = Overloads.getEffectiveOverloads(typeOfOp, name, 0, parent).map(o => o.typeList.length);

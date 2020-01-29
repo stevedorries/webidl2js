@@ -1,8 +1,10 @@
-"use strict";
+import * as utils from "../utils.ts"
 
-const utils = require("../utils");
-
-class Iterable {
+export class Iterable {
+  ctx: any;
+  interface: any;
+  idl: any;
+  name: any;
   constructor(ctx, I, idl) {
     this.ctx = ctx;
     this.interface = I;
@@ -69,5 +71,3 @@ class Iterable {
     };
   }
 }
-
-module.exports = Iterable;

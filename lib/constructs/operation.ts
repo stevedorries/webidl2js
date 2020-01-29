@@ -1,12 +1,14 @@
-"use strict";
+import * as utils from "../utils.ts";
+import * as Overloads from "../overloads.ts";
+import * as Parameters from "../parameters.ts";
+import { default as conversions } from "../webidl_conversions.ts";
 
-const conversions = require("webidl-conversions");
-
-const utils = require("../utils");
-const Overloads = require("../overloads");
-const Parameters = require("../parameters");
-
-class Operation {
+export class Operation {
+  ctx: any;
+  interface: any;
+  idls: any[];
+  name: any;
+  static: boolean;
   constructor(ctx, I, idl) {
     this.ctx = ctx;
     this.interface = I;
@@ -16,10 +18,18 @@ class Operation {
   }
 
   isOnInstance() {
-    const firstOverloadOnInstance = utils.isOnInstance(this.idls[0], this.interface.idl);
+    const firstOverloadOnInstance = utils.isOnInstance(
+      this.idls[0],
+      this.interface.idl
+    );
     for (const overload of this.idls.slice(1)) {
-      if (utils.isOnInstance(overload, this.interface.idl) !== firstOverloadOnInstance) {
-        throw new Error(`[Unforgeable] is not applied uniformly to operation "${this.name}" on ${this.interface.name}`);
+      if (
+        utils.isOnInstance(overload, this.interface.idl) !==
+        firstOverloadOnInstance
+      ) {
+        throw new Error(
+          `[Unforgeable] is not applied uniformly to operation "${this.name}" on ${this.interface.name}`
+        );
       }
     }
     return firstOverloadOnInstance;
@@ -44,13 +54,20 @@ class Operation {
     let str = "";
 
     if (!this.name) {
-      throw new Error(`Internal error: this operation does not have a name (in interface ${this.interface.name})`);
+      throw new Error(
+        `Internal error: this operation does not have a name (in interface ${this.interface.name})`
+      );
     }
 
     const onInstance = this.isOnInstance();
 
     const type = this.static ? "static operation" : "regular operation";
-    const overloads = Overloads.getEffectiveOverloads(type, this.name, 0, this.interface);
+    const overloads = Overloads.getEffectiveOverloads(
+      type,
+      this.name,
+      0,
+      this.interface
+    );
     let minOp = overloads[0];
     for (let i = 1; i < overloads.length; ++i) {
       if (overloads[i].nameList.length < minOp.nameList.length) {
@@ -74,13 +91,22 @@ class Operation {
     const implFunc = this.idls[0].name || this.name;
 
     const parameterConversions = Parameters.generateOverloadConversions(
-      this.ctx, type, this.name, this.interface, `Failed to execute '${this.name}' on '${this.interface.name}': `);
+      this.ctx,
+      type,
+      this.name,
+      this.interface,
+      `Failed to execute '${this.name}' on '${this.interface.name}': `
+    );
     const argsSpread = parameterConversions.hasArgs ? "...args" : "";
     requires.merge(parameterConversions.requires);
     str += parameterConversions.body;
 
     let invocation;
-    if (overloads.every(overload => conversions[overload.operation.idlType.idlType])) {
+    if (
+      overloads.every(
+        overload => conversions[overload.operation.idlType.idlType]
+      )
+    ) {
       invocation = `
         return ${callOn}.${implFunc}(${argsSpread});
       `;
@@ -114,5 +140,3 @@ class Operation {
     return { requires };
   }
 }
-
-module.exports = Operation;

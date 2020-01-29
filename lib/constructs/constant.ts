@@ -1,8 +1,10 @@
-"use strict";
+import * as utils from "../utils.ts"
 
-const utils = require("../utils");
-
-class Constant {
+export class Constant {
+  ctx: any;
+  interface: any;
+  idl: any;
+  str: any;
   constructor(ctx, I, idl) {
     this.ctx = ctx;
     this.interface = I;
@@ -23,5 +25,3 @@ class Constant {
     return { requires: new utils.RequiresMap(this.ctx) };
   }
 }
-
-module.exports = Constant;

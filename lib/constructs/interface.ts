@@ -1,14 +1,12 @@
-"use strict";
-
-const utils = require("../utils");
-const Attribute = require("./attribute");
-const Constant = require("./constant");
-const Iterable = require("./iterable");
-const Operation = require("./operation");
-const Types = require("../types");
-const Overloads = require("../overloads");
-const Parameters = require("../parameters");
-const keywords = require("../keywords");
+import * as utils from "../utils.ts";
+import { Attribute } from "./attribute.ts";
+import { Constant } from "./constant.ts";
+import { Iterable } from "./iterable.ts";
+import { Operation } from "./operation.ts";
+import * as Types from "../types.ts";
+import * as Overloads from "../overloads.ts";
+import * as Parameters from "../parameters.ts";
+import { keywords } from "../keywords.ts";
 
 function isNamed(idl) {
   return idl.arguments[0].idlType.idlType === "DOMString";
@@ -40,7 +38,12 @@ const defaultClassMethodDescriptor = {
 };
 
 // type can be "accessor" or "regular"
-function getPropertyDescriptorModifier(currentDesc, targetDesc, type, value = undefined) {
+function getPropertyDescriptorModifier(
+  currentDesc,
+  targetDesc,
+  type,
+  value = undefined
+) {
   const changes = [];
   if (value !== undefined) {
     changes.push(`value: ${value}`);
@@ -61,7 +64,35 @@ function getPropertyDescriptorModifier(currentDesc, targetDesc, type, value = un
   return `{ ${changes.join(", ")} }`;
 }
 
-class Interface {
+export class Interface {
+  static type = "interface";
+  ctx: any;
+  idl: any;
+  name: any;
+  str: any;
+  opts: any;
+  requires: utils.RequiresMap;
+  implemented: any[];
+  included: any[];
+  constructorOperations: any[];
+  operations: Map<any, any>;
+  staticOperations: Map<any, any>;
+  attributes: Map<any, any>;
+  staticAttributes: Map<any, any>;
+  constants: Map<any, any>;
+  indexedGetter: any;
+  indexedSetter: any;
+  namedGetter: any;
+  namedSetter: any;
+  namedDeleter: any;
+  stringifier: any;
+  iterable: any;
+  _analyzed: boolean;
+  _outputMethods: Map<any, any>;
+  _outputStaticMethods: Map<any, any>;
+  _outputProperties: Map<any, any>;
+  _outputStaticProperties: Map<any, any>;
+  isGlobal: boolean;
   constructor(ctx, idl, opts) {
     this.ctx = ctx;
     this.idl = idl;
@@ -102,17 +133,26 @@ class Interface {
     const global = utils.getExtAttr(this.idl.extAttrs, "Global");
     this.isGlobal = Boolean(global);
     if (global && !global.rhs) {
-      throw new Error(`[Global] must take an identifier or an identifier list in interface ${this.name}`);
+      throw new Error(
+        `[Global] must take an identifier or an identifier list in interface ${this.name}`
+      );
     }
   }
 
   // whence is either "instance" or "prototype"
   // type is either "regular", "get", or "set"
-  addMethod(whence, propName, args, body, type = "regular", {
-    configurable = true,
-    enumerable = typeof propName === "string",
-    writable = type === "regular" ? true : undefined
-  } = {}) {
+  addMethod(
+    whence,
+    propName,
+    args,
+    body,
+    type = "regular",
+    {
+      configurable = true,
+      enumerable = typeof propName === "string",
+      writable = type === "regular" ? true : undefined
+    } = {}
+  ) {
     if (whence !== "instance" && whence !== "prototype") {
       throw new Error(`Internal error: Invalid whence ${whence}`);
     }
@@ -139,11 +179,17 @@ class Interface {
   }
 
   // type is either "regular", "get", or "set"
-  addStaticMethod(propName, args, body, type = "regular", {
-    configurable = true,
-    enumerable = typeof propName === "string",
-    writable = type === "regular" ? true : undefined
-  } = {}) {
+  addStaticMethod(
+    propName,
+    args,
+    body,
+    type = "regular",
+    {
+      configurable = true,
+      enumerable = typeof propName === "string",
+      writable = type === "regular" ? true : undefined
+    } = {}
+  ) {
     if (type !== "regular") {
       const existing = this._outputStaticMethods.get(propName);
       if (existing !== undefined) {
@@ -167,11 +213,16 @@ class Interface {
   }
 
   // whence is either "instance" or "prototype"
-  addProperty(whence, propName, str, {
-    configurable = true,
-    enumerable = typeof propName === "string",
-    writable = true
-  } = {}) {
+  addProperty(
+    whence,
+    propName,
+    str,
+    {
+      configurable = true,
+      enumerable = typeof propName === "string",
+      writable = true
+    } = {}
+  ) {
     if (whence !== "instance" && whence !== "prototype") {
       throw new Error(`Internal error: Invalid whence ${whence}`);
     }
@@ -179,11 +230,15 @@ class Interface {
     this._outputProperties.set(propName, { whence, body: str, descriptor });
   }
 
-  addStaticProperty(propName, str, {
-    configurable = true,
-    enumerable = typeof propName === "string",
-    writable = true
-  } = {}) {
+  addStaticProperty(
+    propName,
+    str,
+    {
+      configurable = true,
+      enumerable = typeof propName === "string",
+      writable = true
+    } = {}
+  ) {
     const descriptor = { configurable, enumerable, writable };
     this._outputStaticProperties.set(propName, { body: str, descriptor });
   }
@@ -192,13 +247,18 @@ class Interface {
     const handleSpecialOperations = member => {
       if (member.type === "operation") {
         if (member.special === "getter") {
-          let msg = `Invalid getter ${member.name ? `"${member.name}" ` : ""}on interface ${this.name}`;
+          let msg = `Invalid getter ${
+            member.name ? `"${member.name}" ` : ""
+          }on interface ${this.name}`;
           if (member.definingInterface !== this.name) {
             msg += ` (defined in ${member.definingInterface})`;
           }
           msg += ": ";
           if (member.arguments.length !== 1) {
-            throw new Error(msg + `1 argument should be present, found ${member.arguments.length}`);
+            throw new Error(
+              msg +
+                `1 argument should be present, found ${member.arguments.length}`
+            );
           }
           if (isIndexed(member)) {
             if (this.indexedGetter) {
@@ -215,14 +275,19 @@ class Interface {
           }
         }
         if (member.special === "setter") {
-          let msg = `Invalid setter ${member.name ? `"${member.name}" ` : ""}on interface ${this.name}`;
+          let msg = `Invalid setter ${
+            member.name ? `"${member.name}" ` : ""
+          }on interface ${this.name}`;
           if (member.definingInterface !== this.name) {
             msg += ` (defined in ${member.definingInterface})`;
           }
           msg += ": ";
 
           if (member.arguments.length !== 2) {
-            throw new Error(msg + `2 arguments should be present, found ${member.arguments.length}`);
+            throw new Error(
+              msg +
+                `2 arguments should be present, found ${member.arguments.length}`
+            );
           }
           if (isIndexed(member)) {
             if (this.indexedSetter) {
@@ -239,14 +304,19 @@ class Interface {
           }
         }
         if (member.special === "deleter") {
-          let msg = `Invalid deleter ${member.name ? `"${member.name}" ` : ""}on interface ${this.name}`;
+          let msg = `Invalid deleter ${
+            member.name ? `"${member.name}" ` : ""
+          }on interface ${this.name}`;
           if (member.definingInterface !== this.name) {
             msg += ` (defined in ${member.definingInterface})`;
           }
           msg += ": ";
 
           if (member.arguments.length !== 1) {
-            throw new Error(msg + `1 arguments should be present, found ${member.arguments.length}`);
+            throw new Error(
+              msg +
+                `1 arguments should be present, found ${member.arguments.length}`
+            );
           }
           if (isNamed(member)) {
             if (this.namedDeleter) {
@@ -286,20 +356,26 @@ class Interface {
           break;
         case "iterable":
           if (this.iterable) {
-            throw new Error(`Interface ${this.name} has more than one iterable declaration`);
+            throw new Error(
+              `Interface ${this.name} has more than one iterable declaration`
+            );
           }
           this.iterable = new Iterable(this.ctx, this, member);
           break;
         default:
           if (!this.ctx.options.suppressErrors) {
-            throw new Error(`Unknown IDL member type "${member.type}" in interface ${this.name}`);
+            throw new Error(
+              `Unknown IDL member type "${member.type}" in interface ${this.name}`
+            );
           }
       }
 
       handleSpecialOperations(member);
 
       if (member.special === "stringifier") {
-        let msg = `Invalid stringifier ${member.name ? `"${member.name}" ` : ""}on interface ${this.name}`;
+        let msg = `Invalid stringifier ${
+          member.name ? `"${member.name}" ` : ""
+        }on interface ${this.name}`;
         if (member.definingInterface !== this.name) {
           msg += ` (defined in ${member.definingInterface})`;
         }
@@ -314,8 +390,13 @@ class Interface {
           if (member.arguments.length > 0) {
             throw new Error(msg + "takes more than zero arguments");
           }
-          if (member.idlType.idlType !== "DOMString" || member.idlType.nullable) {
-            throw new Error(msg + "returns something other than a plain DOMString");
+          if (
+            member.idlType.idlType !== "DOMString" ||
+            member.idlType.nullable
+          ) {
+            throw new Error(
+              msg + "returns something other than a plain DOMString"
+            );
           }
           if (this.stringifier) {
             throw new Error(msg + "duplicated stringifier");
@@ -325,23 +406,34 @@ class Interface {
           this.operations.set("toString", op);
         } else if (member.type === "attribute") {
           if (member.special === "static") {
-            throw new Error(msg + "keyword cannot be placed on static attribute");
+            throw new Error(
+              msg + "keyword cannot be placed on static attribute"
+            );
           }
-          if (member.idlType.idlType !== "DOMString" && member.idlType.idlType !== "USVString" ||
-              member.idlType.nullable) {
-            throw new Error(msg + "attribute can only be of type DOMString or USVString");
+          if (
+            (member.idlType.idlType !== "DOMString" &&
+              member.idlType.idlType !== "USVString") ||
+            member.idlType.nullable
+          ) {
+            throw new Error(
+              msg + "attribute can only be of type DOMString or USVString"
+            );
           }
           // Implemented in Attribute class.
         } else {
-          throw new Error(msg + `keyword placed on incompatible type ${member.type}`);
+          throw new Error(
+            msg + `keyword placed on incompatible type ${member.type}`
+          );
         }
         this.stringifier = member;
       }
     }
     for (const member of this.inheritedMembers(seen)) {
       if (this.iterable && member.type === "iterable") {
-        throw new Error(`Iterable interface ${this.name} inherits from another iterable interface ` +
-                        `${member.definingInterface}`);
+        throw new Error(
+          `Iterable interface ${this.name} inherits from another iterable interface ` +
+            `${member.definingInterface}`
+        );
       }
 
       handleSpecialOperations(member);
@@ -352,11 +444,15 @@ class Interface {
     if (this.iterable) {
       if (this.iterable.isValue) {
         if (!this.supportsIndexedProperties) {
-          throw new Error(`A value iterator cannot be declared on ${this.name} which does not support indexed ` +
-                          "properties");
+          throw new Error(
+            `A value iterator cannot be declared on ${this.name} which does not support indexed ` +
+              "properties"
+          );
         }
       } else if (this.iterable.isPair && this.supportsIndexedProperties) {
-        throw new Error(`A pair iterator cannot be declared on ${this.name} which supports indexed properties`);
+        throw new Error(
+          `A pair iterator cannot be declared on ${this.name} which supports indexed properties`
+        );
       }
       for (const n of ["entries", "forEach", "keys", "values"]) {
         forbiddenMembers.add(n);
@@ -382,7 +478,10 @@ class Interface {
   }
 
   get isLegacyPlatformObj() {
-    return !this.isGlobal && (this.supportsIndexedProperties || this.supportsNamedProperties);
+    return (
+      !this.isGlobal &&
+      (this.supportsIndexedProperties || this.supportsNamedProperties)
+    );
   }
 
   includes(source) {
@@ -391,7 +490,9 @@ class Interface {
       if (this.ctx.options.suppressErrors) {
         return;
       }
-      throw new Error(`${source} interface mixin not found (included in ${this.name})`);
+      throw new Error(
+        `${source} interface mixin not found (included in ${this.name})`
+      );
     }
 
     this.included.push(source);
@@ -512,7 +613,6 @@ class Interface {
 
     this.str = `
       ${this.requires.generate()}
-
       ${this.str}
     `;
   }
@@ -551,7 +651,6 @@ class Interface {
           if (obj instanceof Impl.implementation) {
             return true;
           }
-
           const wrapper = utils.wrapperForImpl(obj);
           for (const isMixedInto of exports._mixedIntoPredicates) {
             if (isMixedInto(wrapper)) {
@@ -589,7 +688,7 @@ class Interface {
     const hasNamedDeleter = this.namedDeleter !== null;
     const overrideBuiltins = Boolean(utils.getExtAttr(this.idl.extAttrs, "OverrideBuiltins"));
 
-    const supportsPropertyIndex = (O, index, indexedValue) => {
+    const supportsPropertyIndex = (O, index, indexedValue?) => {
       let unsupportedValue = utils.getExtAttr(this.indexedGetter.extAttrs, "WebIDL2JSValueAsUnsupported");
       if (unsupportedValue) {
         unsupportedValue = unsupportedValue.rhs.value;
@@ -602,7 +701,7 @@ class Interface {
       return `${O}[impl][utils.supportsPropertyIndex](${index})`;
     };
 
-    const supportsPropertyName = (O, P, namedValue) => {
+    const supportsPropertyName = (O, P, namedValue?) => {
       let unsupportedValue = utils.getExtAttr(this.namedGetter.extAttrs, "WebIDL2JSValueAsUnsupported");
       if (unsupportedValue) {
         unsupportedValue = unsupportedValue.rhs.value;
@@ -1130,12 +1229,10 @@ class Interface {
         if (globalObject[ctorRegistry] === undefined) {
           throw new Error('Internal error: invalid global object');
         }
-
         const ctor = globalObject[ctorRegistry]["${this.name}"];
         if (ctor === undefined) {
           throw new Error('Internal error: constructor ${this.name} is not installed on the passed global object');
         }
-
         let obj = Object.create(ctor.prototype);
         obj = exports.setup(obj, globalObject, constructorArgs, privateData);
         return obj;
@@ -1159,7 +1256,6 @@ class Interface {
       };
       exports.setup = function setup(obj, globalObject, constructorArgs = [], privateData = {}) {
         privateData.wrapper = obj;
-
         exports._internalSetup(obj);
         Object.defineProperty(obj, impl, {
           value: new Impl.implementation(globalObject, constructorArgs, privateData),
@@ -1475,7 +1571,6 @@ class Interface {
           globalObject[ctorRegistry] = Object.create(null);
         }
         globalObject[ctorRegistry][interfaceName] = ${name};
-
         Object.defineProperty(globalObject, interfaceName, {
           configurable: true,
           writable: true,
@@ -1510,7 +1605,3 @@ class Interface {
     return this.str;
   }
 }
-
-Interface.prototype.type = "interface";
-
-module.exports = Interface;

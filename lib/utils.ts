@@ -1,4 +1,3 @@
-
 export function getDefault(dflt) {
   switch (dflt.type) {
     case "boolean":
@@ -36,13 +35,18 @@ export function hasCEReactions(idl) {
 }
 
 export function isOnInstance(memberIDL, interfaceIDL) {
-  return memberIDL.special !== "static" && (getExtAttr(memberIDL.extAttrs, "Unforgeable") || isGlobal(interfaceIDL));
+  return (
+    memberIDL.special !== "static" &&
+    (getExtAttr(memberIDL.extAttrs, "Unforgeable") || isGlobal(interfaceIDL))
+  );
 }
 
 function symbolName(symbol) {
   const desc = String(symbol).replace(/^Symbol\((.*)\)$/, "$1");
   if (!desc.startsWith("Symbol.")) {
-    throw new Error(`Internal error: Unsupported property name ${String(symbol)}`);
+    throw new Error(
+      `Internal error: Unsupported property name ${String(symbol)}`
+    );
   }
   return desc;
 }
@@ -57,26 +61,33 @@ function propertyName(name) {
 }
 
 export function stringifyPropertyKey(prop) {
-  return typeof prop === "symbol" ? `[${symbolName(prop)}]` : propertyName(prop);
+  return typeof prop === "symbol"
+    ? `[${symbolName(prop)}]`
+    : propertyName(prop);
 }
 
 export function stringifyPropertyName(prop) {
-  return typeof prop === "symbol" ? symbolName(prop) : JSON.stringify(propertyName(prop));
+  return typeof prop === "symbol"
+    ? symbolName(prop)
+    : JSON.stringify(propertyName(prop));
 }
 
 export class RequiresMap extends Map {
   ctx: any;
-  
+
   constructor(ctx) {
     super();
     this.ctx = ctx;
   }
 
-  add(type, func = "") {
-    const key = (func + type).replace(/[./-]+/g, " ").trim().replace(/ /g, "_");
+  add(type: string, func = "") {
+    const key = (func + type)
+      .replace(/[./-]+/g, " ")
+      .trim()
+      .replace(/ /g, "_");
 
     const path = type.startsWith(".") ? type : `./${type}`;
-    let req = `require("${path}.js")`;
+    let req = `from "${path}.ts";`;
 
     if (func) {
       req += `.${func}`;
@@ -88,7 +99,11 @@ export class RequiresMap extends Map {
 
   addRaw(key, expr) {
     if (this.has(key) && this.get(key) !== expr) {
-      throw new Error(`Internal error: Variable name clash: ${key}; was ${this.get(key)}, adding: ${expr}`);
+      throw new Error(
+        `Internal error: Variable name clash: ${key}; was ${this.get(
+          key
+        )}, adding: ${expr}`
+      );
     }
     super.set(key, expr);
   }
@@ -103,6 +118,8 @@ export class RequiresMap extends Map {
   }
 
   generate() {
-    return [...this.keys()].map(key => `const ${key} = ${this.get(key)};`).join("\n");
+    return [...this.keys()]
+      .map(key => `const ${key} = ${this.get(key)};`)
+      .join("\n");
   }
 }

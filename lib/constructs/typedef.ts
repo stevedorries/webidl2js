@@ -1,8 +1,11 @@
-"use strict";
+import * as Types from "../types.ts";
 
-const Types = require("../types");
-
-class Typedef {
+export class Typedef {
+  ctx: any;
+  idlOrig: any;
+  idl: any;
+  name: any;
+  resolved: boolean;
   constructor(ctx, idl) {
     this.ctx = ctx;
     this.idlOrig = idl;
@@ -25,5 +28,3 @@ class Typedef {
     return this.idl;
   }
 }
-
-module.exports = Typedef;

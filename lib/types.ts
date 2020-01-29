@@ -1,21 +1,41 @@
-"use strict";
 import * as utils from "./utils.ts";
-import {default as conversions} from "./webidl_conversions.ts";
-
+import { default as conversions } from "./webidl_conversions.ts";
 
 const typedArrayTypes = new Set([
-  "Int8Array", "Int16Array", "Int32Array", "Uint8Array", "Uint16Array", "Uint32Array",
-  "Uint8ClampedArray", "Float32Array", "Float64Array"
+  "Int8Array",
+  "Int16Array",
+  "Int32Array",
+  "Uint8Array",
+  "Uint16Array",
+  "Uint32Array",
+  "Uint8ClampedArray",
+  "Float32Array",
+  "Float64Array"
 ]);
+
 export const arrayBufferViewTypes = new Set([...typedArrayTypes, "DataView"]);
+
 const bufferSourceTypes = new Set([...arrayBufferViewTypes, "ArrayBuffer"]);
+
 export const stringTypes = new Set(["DOMString", "ByteString", "USVString"]);
+
 const integerTypes = new Set([
-  "byte", "octet", "short", "unsigned short", "long", "unsigned long",
-  "long long", "unsigned long long"
+  "byte",
+  "octet",
+  "short",
+  "unsigned short",
+  "long",
+  "unsigned long",
+  "long long",
+  "unsigned long long"
 ]);
+
 export const numericTypes = new Set([
-  ...integerTypes, "float", "unrestricted float", "double", "unrestricted double"
+  ...integerTypes,
+  "float",
+  "unrestricted float",
+  "double",
+  "unrestricted double"
 ]);
 
 const resolvedMap = new WeakMap();
@@ -66,7 +86,9 @@ export function resolveType(ctx, idlType, stack = []) {
     out.extAttrs = deepClone(mergeExtAttrs(out.extAttrs, idlType.extAttrs));
     if (out.union) {
       for (const type of out.idlType) {
-        type.extAttrs = deepClone(mergeExtAttrs(type.extAttrs, idlType.extAttrs));
+        type.extAttrs = deepClone(
+          mergeExtAttrs(type.extAttrs, idlType.extAttrs)
+        );
       }
     }
     return out;
@@ -82,12 +104,22 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parentName, errPrefix = '"The provided value"') {
+export function generateTypeConversion(
+  ctx: { typeOf: (arg0: any) => string; },
+  name: string,
+  idlType: { extAttrs: any; nullable: any; union: any; generic: string; idlType: any; array: any; },
+  argAttrs = [],
+  parentName: string,
+  errPrefix = '"The provided value"'
+) {
   const requires = new utils.RequiresMap(ctx);
   let str = "";
 
   idlType = resolveType(ctx, idlType);
-  const extAttrs = idlType.extAttrs !== undefined ? [...idlType.extAttrs, ...argAttrs] : argAttrs;
+  const extAttrs =
+    idlType.extAttrs !== undefined
+      ? [...idlType.extAttrs, ...argAttrs]
+      : argAttrs;
 
   if (idlType.nullable) {
     str += `
@@ -154,7 +186,14 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
     }
 
     if (!idlType.nullable && union.dictionary) {
-      const conv = generateTypeConversion(ctx, name, union.dictionary, [], parentName, errPrefix);
+      const conv = generateTypeConversion(
+        ctx,
+        name,
+        union.dictionary,
+        [],
+        parentName,
+        errPrefix
+      );
       requires.merge(conv.requires);
       output.push(`
         if (${name} === null || ${name} === undefined) {
@@ -194,7 +233,9 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
       let condition = `ArrayBuffer.isView(${name})`;
       // Skip specific type check if all ArrayBufferView member types are allowed.
       if (union.ArrayBufferViews.size !== arrayBufferViewTypes.size) {
-        const exprs = [...union.ArrayBufferViews].map(a => `${name}.constructor.name === "${a}"`);
+        const exprs = [...union.ArrayBufferViews].map(
+          a => `${name}.constructor.name === "${a}"`
+        );
         condition += ` && (${exprs.join(" || ")})`;
       }
       output.push(`if (${condition}) {}`);
@@ -204,13 +245,24 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
       output.push(`if (typeof ${name} === "function") {}`);
     }
 
-    if (union.sequenceLike || union.dictionary || union.record || union.object) {
+    if (
+      union.sequenceLike ||
+      union.dictionary ||
+      union.record ||
+      union.object
+    ) {
       let code = `if (utils.isObject(${name})) {`;
 
       if (union.sequenceLike) {
         code += `if (${name}[Symbol.iterator] !== undefined) {`;
-        const conv = generateTypeConversion(ctx, name, union.sequenceLike, [], parentName,
-          `${errPrefix} + " sequence"`);
+        const conv = generateTypeConversion(
+          ctx,
+          name,
+          union.sequenceLike,
+          [],
+          parentName,
+          `${errPrefix} + " sequence"`
+        );
         requires.merge(conv.requires);
         code += conv.body;
         code += `} else {`;
@@ -218,8 +270,14 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
 
       if (union.dictionary || union.record) {
         const prop = union.dictionary ? "dictionary" : "record";
-        const conv = generateTypeConversion(ctx, name, union[prop], [], parentName,
-          `${errPrefix} + " ${prop}"`);
+        const conv = generateTypeConversion(
+          ctx,
+          name,
+          union[prop],
+          [],
+          parentName,
+          `${errPrefix} + " ${prop}"`
+        );
         requires.merge(conv.requires);
         code += conv.body;
       } else if (union.object) {
@@ -238,7 +296,16 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
     if (union.boolean) {
       output.push(`
         if (typeof ${name} === "boolean") {
-          ${generateTypeConversion(ctx, name, union.boolean, [], parentName, errPrefix).body}
+          ${
+            generateTypeConversion(
+              ctx,
+              name,
+              union.boolean,
+              [],
+              parentName,
+              errPrefix
+            ).body
+          }
         }
       `);
     }
@@ -246,7 +313,16 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
     if (union.numeric) {
       output.push(`
         if (typeof ${name} === "number") {
-          ${generateTypeConversion(ctx, name, union.numeric, [], parentName, errPrefix).body}
+          ${
+            generateTypeConversion(
+              ctx,
+              name,
+              union.numeric,
+              [],
+              parentName,
+              errPrefix
+            ).body
+          }
         }
       `);
     }
@@ -255,7 +331,14 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
       let code = "{";
       const type = union.string || union.numeric || union.boolean;
       if (type) {
-        const conv = generateTypeConversion(ctx, name, type, [], parentName, errPrefix);
+        const conv = generateTypeConversion(
+          ctx,
+          name,
+          type,
+          [],
+          parentName,
+          errPrefix
+        );
         code += conv.body;
         requires.merge(conv.requires);
       } else {
@@ -269,8 +352,14 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
   }
 
   function generateSequence() {
-    const conv = generateTypeConversion(ctx, "nextItem", idlType.idlType[0], [], parentName,
-      `${errPrefix} + "'s element"`);
+    const conv = generateTypeConversion(
+      ctx,
+      "nextItem",
+      idlType.idlType[0],
+      [],
+      parentName,
+      `${errPrefix} + "'s element"`
+    );
     requires.merge(conv.requires);
 
     str += `
@@ -289,11 +378,23 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
   }
 
   function generateRecord() {
-    const keyConv = generateTypeConversion(ctx, "typedKey", idlType.idlType[0], [], parentName,
-      `${errPrefix} + "'s key"`);
+    const keyConv = generateTypeConversion(
+      ctx,
+      "typedKey",
+      idlType.idlType[0],
+      [],
+      parentName,
+      `${errPrefix} + "'s key"`
+    );
     requires.merge(keyConv.requires);
-    const valConv = generateTypeConversion(ctx, "typedValue", idlType.idlType[1], [], parentName,
-      `${errPrefix} + "'s value"`);
+    const valConv = generateTypeConversion(
+      ctx,
+      "typedValue",
+      idlType.idlType[1],
+      [],
+      parentName,
+      `${errPrefix} + "'s value"`
+    );
     requires.merge(valConv.requires);
 
     str += `
@@ -323,8 +424,14 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
       // Do nothing.
       handler = "";
     } else {
-      const conv = generateTypeConversion(ctx, "value", idlType.idlType[0], [], parentName,
-        `${errPrefix} + " promise value"`);
+      const conv = generateTypeConversion(
+        ctx,
+        "value",
+        idlType.idlType[0],
+        [],
+        parentName,
+        `${errPrefix} + " promise value"`
+      );
       requires.merge(conv.requires);
       handler = `
         ${conv.body}
@@ -375,7 +482,7 @@ export function generateTypeConversion(ctx, name, idlType, argAttrs = [], parent
 // Condense the member types of a union to a more consumable structured object. At the same time, check for the validity
 // of the union type (no forbidden types, no indistinguishable member types). Duplicated types are allowed for now
 // though.
-function extractUnionInfo(ctx, idlType, errPrefix) {
+function extractUnionInfo(ctx: any, idlType: { extAttrs?: any; nullable?: any; union?: any; generic: string; idlType: any; array?: any; }, errPrefix: string) {
   const seen = {
     sequenceLike: null,
     record: null,
@@ -383,7 +490,7 @@ function extractUnionInfo(ctx, idlType, errPrefix) {
       return this.dictionary !== null || this.record !== null;
     },
     ArrayBuffer: false,
-    ArrayBufferViews: new Set(),
+    ArrayBufferViews: new Set<any>(),
     get BufferSource() {
       return this.ArrayBuffer || this.ArrayBufferViews.size > 0;
     },
@@ -394,7 +501,7 @@ function extractUnionInfo(ctx, idlType, errPrefix) {
     // Callback function, not interface
     callback: false,
     dictionary: null,
-    interfaces: new Set(),
+    interfaces: new Set<any>(),
     get interfaceLike() {
       return this.interfaces.size > 0 || this.BufferSource;
     },
@@ -427,7 +534,10 @@ function extractUnionInfo(ctx, idlType, errPrefix) {
         error(`${item.idlType} is not distinguishable with object type`);
       }
       seen.ArrayBufferViews.add(item.idlType);
-    } else if (stringTypes.has(item.idlType) || ctx.enumerations.has(item.idlType)) {
+    } else if (
+      stringTypes.has(item.idlType) ||
+      ctx.enumerations.has(item.idlType)
+    ) {
       if (seen.string) {
         error("There can only be one string type in a union type");
       }
@@ -459,7 +569,9 @@ function extractUnionInfo(ctx, idlType, errPrefix) {
         error("Callback functions are not distinguishable with object type");
       }
       if (seen.dictionaryLike) {
-        error("Callback functions are not distinguishable with dictionary-like types");
+        error(
+          "Callback functions are not distinguishable with dictionary-like types"
+        );
       }
       seen.callback = true;
     } else if (ctx.dictionaries.has(item.idlType)) {
@@ -467,7 +579,9 @@ function extractUnionInfo(ctx, idlType, errPrefix) {
         error("Dictionary-like types are not distinguishable with object type");
       }
       if (seen.callback) {
-        error("Dictionary-like types are not distinguishable with callback functions");
+        error(
+          "Dictionary-like types are not distinguishable with callback functions"
+        );
       }
       if (seen.dictionaryLike) {
         error("There can only be one dictionary-like type in a union type");

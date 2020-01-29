@@ -1,12 +1,13 @@
-"use strict";
+import { default as reflector } from "../reflector.ts";
+import { default as conversions } from "../webidl_conversions.ts";
+import * as utils from "../utils.ts";
+import * as Types from "../types.ts";
 
-const conversions = require("webidl-conversions");
-
-const utils = require("../utils");
-const reflector = require("../reflector");
-const Types = require("../types");
-
-class Attribute {
+export class Attribute {
+  ctx: any;
+  interface: any;
+  idl: any;
+  static: boolean;
   constructor(ctx, I, idl) {
     this.ctx = ctx;
     this.interface = I;
@@ -24,7 +25,8 @@ class Attribute {
     const onInstance = utils.isOnInstance(this.idl, this.interface.idl);
 
     let objName = `this`;
-    if (onInstance) { // we're in a setup method
+    if (onInstance) {
+      // we're in a setup method
       objName = `obj`;
     }
     let brandCheck = `
@@ -38,9 +40,12 @@ class Attribute {
       getterBody = `return ${objName}[impl]["${this.idl.name}"];`;
     }
 
-    const addMethod = this.static ?
-      this.interface.addStaticMethod.bind(this.interface) :
-      this.interface.addMethod.bind(this.interface, onInstance ? "instance" : "prototype");
+    const addMethod = this.static
+      ? this.interface.addStaticMethod.bind(this.interface)
+      : this.interface.addMethod.bind(
+          this.interface,
+          onInstance ? "instance" : "prototype"
+        );
 
     if (this.static) {
       brandCheck = "";
@@ -50,9 +55,17 @@ class Attribute {
       if (!reflector[this.idl.idlType.idlType]) {
         throw new Error("Unknown reflector type: " + this.idl.idlType.idlType);
       }
-      const attrName = shouldReflect.rhs && shouldReflect.rhs.value.replace(/_/g, "-") || this.idl.name;
-      getterBody = reflector[this.idl.idlType.idlType].get(objName, attrName.toLowerCase());
-      setterBody = reflector[this.idl.idlType.idlType].set(objName, attrName.toLowerCase());
+      const attrName =
+        (shouldReflect.rhs && shouldReflect.rhs.value.replace(/_/g, "-")) ||
+        this.idl.name;
+      getterBody = reflector[this.idl.idlType.idlType].get(
+        objName,
+        attrName.toLowerCase()
+      );
+      setterBody = reflector[this.idl.idlType.idlType].set(
+        objName,
+        attrName.toLowerCase()
+      );
     }
 
     if (utils.getExtAttr(this.idl.extAttrs, "LenientThis")) {
@@ -66,19 +79,34 @@ class Attribute {
     if (utils.hasCEReactions(this.idl)) {
       const processorConfig = { requires };
 
-      getterBody = this.ctx.invokeProcessCEReactions(getterBody, processorConfig);
-      setterBody = this.ctx.invokeProcessCEReactions(setterBody, processorConfig);
+      getterBody = this.ctx.invokeProcessCEReactions(
+        getterBody,
+        processorConfig
+      );
+      setterBody = this.ctx.invokeProcessCEReactions(
+        setterBody,
+        processorConfig
+      );
     }
 
-    addMethod(this.idl.name, [], `
+    addMethod(
+      this.idl.name,
+      [],
+      `
       ${brandCheck}
       ${getterBody}
-    `, "get", { configurable });
+    `,
+      "get",
+      { configurable }
+    );
 
     if (!this.idl.readonly) {
       let idlConversion;
-      if (typeof this.idl.idlType.idlType === "string" && !this.idl.idlType.nullable &&
-          this.ctx.enumerations.has(this.idl.idlType.idlType)) {
+      if (
+        typeof this.idl.idlType.idlType === "string" &&
+        !this.idl.idlType.nullable &&
+        this.ctx.enumerations.has(this.idl.idlType.idlType)
+      ) {
         requires.add(this.idl.idlType.idlType);
         idlConversion = `
           V = \`\${V}\`;
@@ -88,24 +116,46 @@ class Attribute {
         `;
       } else {
         const conv = Types.generateTypeConversion(
-          this.ctx, "V", this.idl.idlType, this.idl.extAttrs, this.interface.name,
-          `"Failed to set the '${this.idl.name}' property on '${this.interface.name}': The provided value"`);
+          this.ctx,
+          "V",
+          this.idl.idlType,
+          this.idl.extAttrs,
+          this.interface.name,
+          `"Failed to set the '${this.idl.name}' property on '${this.interface.name}': The provided value"`
+        );
         requires.merge(conv.requires);
         idlConversion = conv.body;
       }
 
-      addMethod(this.idl.name, ["V"], `
+      addMethod(
+        this.idl.name,
+        ["V"],
+        `
         ${brandCheck}
         ${idlConversion}
         ${setterBody}
-      `, "set", { configurable });
+      `,
+        "set",
+        { configurable }
+      );
     } else if (utils.getExtAttr(this.idl.extAttrs, "PutForwards")) {
-      addMethod(this.idl.name, ["V"], `
+      addMethod(
+        this.idl.name,
+        ["V"],
+        `
         ${brandCheck}
-        this.${this.idl.name}.${utils.getExtAttr(this.idl.extAttrs, "PutForwards").rhs.value} = V;
-      `, "set", { configurable });
+        this.${this.idl.name}.${
+          utils.getExtAttr(this.idl.extAttrs, "PutForwards").rhs.value
+        } = V;
+      `,
+        "set",
+        { configurable }
+      );
     } else if (utils.getExtAttr(this.idl.extAttrs, "Replaceable")) {
-      addMethod(this.idl.name, ["V"], `
+      addMethod(
+        this.idl.name,
+        ["V"],
+        `
         ${brandCheck}
         Object.defineProperty(this, "${this.idl.name}", {
           configurable: true,
@@ -113,20 +163,27 @@ class Attribute {
           value: V,
           writable: true
         });
-      `, "set", { configurable });
+      `,
+        "set",
+        { configurable }
+      );
     }
 
     if (!this.static && this.idl.special === "stringifier") {
-      addMethod("toString", [], `
+      addMethod(
+        "toString",
+        [],
+        `
         if (!this || !exports.is(this)) {
           throw new TypeError("Illegal invocation");
         }
         ${getterBody};
-      `, "regular", { configurable, writable: configurable });
+      `,
+        "regular",
+        { configurable, writable: configurable }
+      );
     }
 
     return { requires };
   }
 }
-
-module.exports = Attribute;

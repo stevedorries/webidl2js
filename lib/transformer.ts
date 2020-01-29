@@ -1,20 +1,39 @@
-"use strict";
+import {
+  dirname,
+  fs,
+  path,
+  webidl2,
+  prettier,
+  prettierPlugins
+} from "./deps.ts";
+import { Context } from "./context.ts";
+import { Interface } from "./constructs/interface.ts";
+import { Typedef } from "./constructs/typedef.ts";
+import { InterfaceMixin } from "./constructs/interface-mixin.ts";
+import { Dictionary } from "./constructs/dictionary.ts";
+import { Enumeration } from "./constructs/enumeration.ts";
 
-const path = require("path");
+const __dirname = dirname({ url: import.meta.url });
+const utf8Decoder = new TextDecoder("utf-8");
+const utf8Encoder = new TextEncoder();
 
-const fs = require("pn/fs");
-const webidl = require("webidl2");
-const prettier = require("prettier");
+export interface TransformerOptions {
+  suppressErrors?: any;
+  processHTMLConstructor?: (code: any) => any;
+  processCEReactions?: (code: any) => any;
+  implSuffix?: string;
+}
 
-const Context = require("./context");
-const Typedef = require("./constructs/typedef");
-const Interface = require("./constructs/interface");
-const InterfaceMixin = require("./constructs/interface-mixin");
-const Dictionary = require("./constructs/dictionary");
-const Enumeration = require("./constructs/enumeration");
+export interface SourcePaths {
+  idlPath?: string;
+  impl?: string;
+}
 
-class Transformer {
-  constructor(opts = {}) {
+export class Transformer {
+  ctx: Context;
+  sources: { idlPath: string; impl: string }[];
+  utilPath: string;
+  constructor(opts: TransformerOptions = {}) {
     this.ctx = new Context({
       implSuffix: opts.implSuffix,
       processCEReactions: opts.processCEReactions,
@@ -28,7 +47,7 @@ class Transformer {
     this.utilPath = null;
   }
 
-  addSource(idl, impl) {
+  addSource(idl: string, impl: string) {
     if (typeof idl !== "string") {
       throw new TypeError("idl path has to be a string");
     }
@@ -40,12 +59,14 @@ class Transformer {
   }
 
   async _collectSources() {
-    const stats = await Promise.all(this.sources.map(src => fs.stat(src.idlPath)));
-    const files = [];
+    const stats = await Promise.all(
+      this.sources.map(src => Deno.stat(src.idlPath))
+    );
+    const files: SourcePaths[] = [];
     for (let i = 0; i < stats.length; ++i) {
       if (stats[i].isDirectory()) {
-        const folderContents = await fs.readdir(this.sources[i].idlPath);
-        for (const file of folderContents) {
+        const folderContents = fs.walk(this.sources[i].idlPath);
+        for (const file in folderContents) {
           if (file.endsWith(".webidl")) {
             files.push({
               idlPath: path.join(this.sources[i].idlPath, file),
@@ -63,9 +84,11 @@ class Transformer {
     return files;
   }
 
-  async _readFiles(files) {
+  async _readFiles(files: SourcePaths[]) {
     const zipped = [];
-    const fileContents = await Promise.all(files.map(f => fs.readFile(f.idlPath, { encoding: "utf-8" })));
+    const fileContents = (
+      await Promise.all(files.map(f => Deno.readFile(f.idlPath)))
+    ).map(cont => utf8Decoder.decode(cont));
     for (let i = 0; i < files.length; ++i) {
       zipped.push({
         idlContent: fileContents[i],
@@ -75,19 +98,27 @@ class Transformer {
     return zipped;
   }
 
-  _parse(outputDir, contents) {
-    const parsed = contents.map(content => ({
-      idl: webidl.parse(content.idlContent),
-      impl: content.impl
-    }));
+  _parse(outputDir: string, contents: any[]) {
+    const parsed = contents.map(
+      (content: { idlContent: string; impl: string }) => ({
+        idl: webidl2.parse(content.idlContent),
+        impl: content.impl
+      })
+    );
 
     this.ctx.initialize();
-    const { interfaces, interfaceMixins, dictionaries, enumerations, typedefs } = this.ctx;
+    const {
+      interfaces,
+      interfaceMixins,
+      dictionaries,
+      enumerations,
+      typedefs
+    } = this.ctx;
 
     // first we're gathering all full interfaces and ignore partial ones
     for (const file of parsed) {
       for (const instruction of file.idl) {
-        let obj;
+        let obj: { name: any };
         switch (instruction.type) {
           case "interface":
             if (instruction.partial) {
@@ -136,15 +167,18 @@ class Transformer {
     // second we add all partial members and handle includes
     for (const file of parsed) {
       for (const instruction of file.idl) {
-        let oldMembers;
-        let extAttrs;
+        let oldMembers: any[];
+        let extAttrs: any[];
         switch (instruction.type) {
           case "interface":
             if (!instruction.partial) {
               break;
             }
 
-            if (this.ctx.options.suppressErrors && !interfaces.has(instruction.name)) {
+            if (
+              this.ctx.options.suppressErrors &&
+              !interfaces.has(instruction.name)
+            ) {
               break;
             }
             oldMembers = interfaces.get(instruction.name).idl.members;
@@ -157,7 +191,10 @@ class Transformer {
               break;
             }
 
-            if (this.ctx.options.suppressErrors && !interfaceMixins.has(instruction.name)) {
+            if (
+              this.ctx.options.suppressErrors &&
+              !interfaceMixins.has(instruction.name)
+            ) {
               break;
             }
             oldMembers = interfaceMixins.get(instruction.name).idl.members;
@@ -169,7 +206,10 @@ class Transformer {
             if (!instruction.partial) {
               break;
             }
-            if (this.ctx.options.suppressErrors && !dictionaries.has(instruction.name)) {
+            if (
+              this.ctx.options.suppressErrors &&
+              !dictionaries.has(instruction.name)
+            ) {
               break;
             }
             oldMembers = dictionaries.get(instruction.name).idl.members;
@@ -178,69 +218,86 @@ class Transformer {
             extAttrs.push(...instruction.extAttrs);
             break;
           case "includes":
-            if (this.ctx.options.suppressErrors && !interfaces.has(instruction.target)) {
+            if (
+              this.ctx.options.suppressErrors &&
+              !interfaces.has((instruction as any).target)
+            ) {
               break;
             }
-            interfaces.get(instruction.target).includes(instruction.includes);
+            interfaces
+              .get((instruction as any).target)
+              .includes((instruction as any).includes);
             break;
         }
       }
     }
   }
 
-  async _writeFiles(outputDir) {
-    const utilsText = await fs.readFile(path.resolve(__dirname, "output/utils.js"));
-    await fs.writeFile(this.utilPath, utilsText);
+  async _writeFiles(outputDir: string) {
+    const utilsText = await Deno.readFile(
+      path.resolve(__dirname, "output/utils.js")
+    );
+
+    await Deno.writeFile(this.utilPath, utilsText);
 
     const { interfaces, dictionaries, enumerations } = this.ctx;
 
     for (const obj of interfaces.values()) {
       let source = obj.toString();
 
-      let implFile = path.relative(outputDir, path.resolve(obj.opts.implDir, obj.name + this.ctx.implSuffix));
+      let implFile = path.relative(
+        outputDir,
+        path.resolve(obj.opts.implDir, obj.name + this.ctx.implSuffix)
+      );
       implFile = implFile.replace(/\\/g, "/"); // fix windows file paths
       if (implFile[0] !== ".") {
         implFile = "./" + implFile;
       }
 
-      let relativeUtils = path.relative(outputDir, this.utilPath).replace(/\\/g, "/");
+      let relativeUtils = path
+        .relative(outputDir, this.utilPath)
+        .replace(/\\/g, "/");
       if (relativeUtils[0] !== ".") {
         relativeUtils = "./" + relativeUtils;
       }
 
       source = `
-        "use strict";
-
-        const conversions = require("webidl-conversions");
-        const utils = require("${relativeUtils}");
+        const conversions = `+`require("webidl-conversions");
+        import as utils`+` from "${relativeUtils}";
         ${source}
-        const Impl = require("${implFile}.js");
+        import * as Impl`+` from "${implFile}.ts";
       `;
 
       source = this._prettify(source);
 
-      await fs.writeFile(path.join(outputDir, obj.name + ".js"), source);
+      await Deno.writeFile(
+        path.join(outputDir, obj.name + ".ts"),
+        utf8Encoder.encode(source)
+      );
     }
 
     for (const obj of dictionaries.values()) {
       let source = obj.toString();
 
-      let relativeUtils = path.relative(outputDir, this.utilPath).replace(/\\/g, "/");
+      let relativeUtils = path
+        .relative(outputDir, this.utilPath)
+        .replace(/\\/g, "/");
       if (relativeUtils[0] !== ".") {
         relativeUtils = "./" + relativeUtils;
       }
 
       source = `
-        "use strict";
-
-        const conversions = require("webidl-conversions");
-        const utils = require("${relativeUtils}");
+        import * as conversions `+`from "./webidl_conversions.ts");
+        import * as utils `+`from "${relativeUtils}";
         ${source}
       `;
 
       source = this._prettify(source);
 
-      await fs.writeFile(path.join(outputDir, obj.name + ".js"), source);
+      await Deno.writeFile(
+        path.join(outputDir, obj.name + ".ts"),
+        utf8Encoder.encode(source)
+      );
     }
 
     for (const obj of enumerations.values()) {
@@ -249,20 +306,24 @@ class Transformer {
 
         ${obj.toString()}
       `);
-      await fs.writeFile(path.join(outputDir, obj.name + ".js"), source);
+      await Deno.writeFile(
+        path.join(outputDir, obj.name + ".ts"),
+        utf8Encoder.encode(source)
+      );
     }
   }
 
-  _prettify(source) {
+  _prettify(source: string) {
     return prettier.format(source, {
       printWidth: 120,
-      parser: "babel"
+      parser: "babel",
+      plugins: prettierPlugins
     });
   }
 
-  async generate(outputDir) {
+  async generate(outputDir: string) {
     if (!this.utilPath) {
-      this.utilPath = path.join(outputDir, "utils.js");
+      this.utilPath = path.join(outputDir, "utils.ts");
     }
 
     const sources = await this._collectSources();
@@ -272,4 +333,3 @@ class Transformer {
   }
 }
 
-module.exports = Transformer;

@@ -1,6 +1,8 @@
-"use strict";
-
-class Enumeration {
+export class Enumeration {
+  ctx: any;
+  idl: any;
+  name: any;
+  str: any;
   constructor(ctx, idl) {
     this.ctx = ctx;
     this.idl = idl;
@@ -15,10 +17,9 @@ class Enumeration {
     }
 
     this.str += `
-      const enumerationValues = new Set(${JSON.stringify([...values])});
-      exports.enumerationValues = enumerationValues;
-
-      exports.convert = function convert(value, { context = "The provided value" } = {}) {
+      export enumerationValues = new Set(${JSON.stringify([...values])});
+      
+      export function convert(value, { context = "The provided value" } = {}) {
         const string = \`\${value}\`;
         if (!enumerationValues.has(value)) {
           throw new TypeError(\`\${context} '\${value}' is not a valid enumeration value for ${this.name}\`);
@@ -34,5 +35,3 @@ class Enumeration {
     return this.str;
   }
 }
-
-module.exports = Enumeration;
